@@ -5,6 +5,7 @@ import urllib
 import os
 import re
 import time
+from sqlalchemy import *
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
@@ -27,16 +28,30 @@ print(colors.HEADER+"funky spider v"+VERSION+colors.ENDC)
 
 # Settings
 print(colors.OKBLUE+"Setting settings..."+colors.ENDC)
-allowed_hosts = ["zippyshare", "mediafire"]
+allowed_hosts = ["zippyshare", "mediafire", "ifolder"]
+
 funky_user = ""
 if os.environ.get('FUNKY_USER'):
 	print(colors.OKGREEN+"\tSetting username from FUNKY_USER"+colors.ENDC)
 	funky_user = os.environ.get('FUNKY_USER')
+
 funky_pass = ""
 if os.environ.get('FUNKY_PASS'):
 	print(colors.OKGREEN+"\tSetting password from FUNKY_PASS"+colors.ENDC)
 	funky_pass = os.environ.get('FUNKY_PASS')
+
 funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890", "http://forum.funkysouls.com/index.php?s=&act=ST&f=71&t=11701"]
+
+funky_db = "sqlite:///funky.db"
+if os.environ.get('FUNKY_DB'):
+	print(colors.OKGREEN+"\tSetting DB URI from FUNKY_DB"+colors.ENDC)
+	funky_db = os.environ.get('FUNKY_DB')
+
+# Database
+db = create_engine(funky_db)
+threads = Table()
+links = Table()
+files = Table()
 
 # Cookies
 print(colors.OKBLUE+"Making a cookie jar..."+colors.ENDC)
