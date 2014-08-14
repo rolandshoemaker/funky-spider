@@ -4,8 +4,9 @@ import http.cookiejar, urllib.request
 import urllib
 import os
 import re
+import time
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 class colors:
     HEADER = '\033[95m'
@@ -14,6 +15,9 @@ class colors:
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
+
+def zippy_attack(url):
+	pass 
 
 def get_cookie(jar, name):
 	return [cookie for cookie in jar if cookie.name == name][0]
@@ -32,7 +36,7 @@ funky_pass = ""
 if os.environ.get('FUNKY_PASS'):
 	print(colors.OKGREEN+"\tSetting password from FUNKY_PASS"+colors.ENDC)
 	funky_pass = os.environ.get('FUNKY_PASS')
-funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890&s=", "http://forum.funkysouls.com/index.php?s=&act=ST&f=71&t=11701&st=7500"]
+funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890", "http://forum.funkysouls.com/index.php?s=&act=ST&f=71&t=11701"]
 
 # Cookies
 print(colors.OKBLUE+"Making a cookie jar..."+colors.ENDC)
@@ -68,20 +72,42 @@ for thread in funky_threads:
 		title = soup.title.text.split(" :: ")
 		print(colors.OKGREEN+"\t\tParsing html for thread: "+title[0]+colors.ENDC)
 
-		# Pagination code!
-		trans = str.maketrans('[]\\', '   ')
-		html = html.translate(trans)
-		link_list = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', html)
-		for link in link_list:
-			if re.match('https?:\/\/forum\.funkysouls\.com\/go\.php\?(.+)', link):
-				full = re.search('https?:\/\/forum\.funkysouls\.com\/go\.php\?(.+)', link)
-				m = re.search('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', full.group(1))
-				domain = urlparse(m.group(0)).hostname.split('.')
-				# Also check if it's already in mysql table, then push urls into a list 
-				if len(domain) is 3 and domain[1] in allowed_hosts:
-					print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
-				elif len(domain) is 2 and domain[0] in allowed_hosts:
-					print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
+		# Check how many pages
+		for nav in soup.find_all('a'):
+			if nav.string == "Last »":
+				length = parse_qs(urlparse(nav['href']).query)['st'][0]
+				length = length.replace('\\', '')
+				length = length.replace('\'', '')
+				length = int(length)
+				print(colors.OKGREEN+"\t\tPages: "+str(int(length/15))+colors.ENDC)
+				break
+
+		#for (i = 0;i<=length;i+15):
+		for i in range(0, int(length), 15):			
+			pg_num_data = urllib.parse.urlencode({"st": i})
+			pg_num = pg_num_data.encode('ascii')
+			page_req = urllib.request.Request(thread, pg_num)
+			page_data = urllib.request.urlopen(page_req)
+			page_html = str(page_data.read())
+			page_soup = BeautifulSoup(page_html)
+
+			print(colors.OKGREEN+"\t\t\tPage "+str(int(i/15))+colors.ENDC)
+
+			trans = str.maketrans('[]\\', '   ')
+			page_html = page_html.translate(trans)
+			link_list = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', page_html)
+			for link in link_list:
+				if re.match('https?:\/\/forum\.funkysouls\.com\/go\.php\?(.+)', link):
+					full = re.search('https?:\/\/forum\.funkysouls\.com\/go\.php\?(.+)', link)
+					m = re.search('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', full.group(1))
+					if not m is None:
+						domain = urlparse(m.group(0)).hostname.split('.')
+						# Also check if it's already in mysql table, then push urls into a list 
+						if len(domain) is 3 and domain[1] in allowed_hosts:
+							print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
+						elif len(domain) is 2 and domain[0] in allowed_hosts:
+							print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
+				#time.sleep(0.5)
 
 # (after finished building link list)
 # Sort link list into seperate lists for seperate attack vectors
