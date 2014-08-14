@@ -32,7 +32,7 @@ funky_pass = ""
 if os.environ.get('FUNKY_PASS'):
 	print(colors.OKGREEN+"\tSetting password from FUNKY_PASS"+colors.ENDC)
 	funky_pass = os.environ.get('FUNKY_PASS')
-funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890&s="]
+funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890&s=", "http://forum.funkysouls.com/index.php?s=&act=ST&f=71&t=11701&st=7500"]
 
 # Cookies
 print(colors.OKBLUE+"Making a cookie jar..."+colors.ENDC)
@@ -63,21 +63,34 @@ for thread in funky_threads:
 	thread_req = urllib.request.Request(thread)
 	data = urllib.request.urlopen(thread_req)
 	if data.status == 200:
-		print(colors.OKGREEN+"\tparsing html for links"+colors.ENDC)
 		html = str(data.read())
+		soup = BeautifulSoup(html)
+		title = soup.title.text.split(" :: ")
+		print(colors.OKGREEN+"\t\tParsing html for thread: "+title[0]+colors.ENDC)
+
+		# Pagination code!
 		trans = str.maketrans('[]\\', '   ')
 		html = html.translate(trans)
-		#soup = BeautifulSoup(str(data.read()))
 		link_list = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', html)
 		for link in link_list:
 			if re.match('https?:\/\/forum\.funkysouls\.com\/go\.php\?(.+)', link):
 				full = re.search('https?:\/\/forum\.funkysouls\.com\/go\.php\?(.+)', link)
 				m = re.search('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', full.group(1))
 				domain = urlparse(m.group(0)).hostname.split('.')
+				# Also check if it's already in mysql table, then push urls into a list 
 				if len(domain) is 3 and domain[1] in allowed_hosts:
-					print("\t\t"+m.group(0))
+					print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
 				elif len(domain) is 2 and domain[0] in allowed_hosts:
-					print("\t\t"+m.group(0))
+					print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
+
+# (after finished building link list)
+# Sort link list into seperate lists for seperate attack vectors
+
+# Execute each attack to download all files in link list (if dead link point that out in mysql...)
+
+# Extract files to temp dir, check if they have ID3 info, if not go to more extreme measures, store info in mysql database, if we get duplicate just delete it
+
+# Move remaining good files to final resting place, could do basic tagging/organization
 
 # Destroy our cookie jar
 cookies.clear()
