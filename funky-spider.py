@@ -5,7 +5,7 @@ import urllib
 import os
 import re
 import time
-from sqlalchemy import *
+#from sqlalchemy import *
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
@@ -17,8 +17,36 @@ class colors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
+class AppURLopener(urllib.request.FancyURLopener):
+	version = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"
+
+urllib._urlopener = AppURLopener()
+
 def zippy_attack(url):
-	pass 
+	zippy_req = urllib.request.Request(url)
+	zippy_data = urllib.request.urlopen(zippy_req)
+	if zippy_data.status == 200:
+		zippy_html = str(zippy_data.read())
+		zippy_soup = BeautifulSoup(zippy_html)
+		if not zippy_soup.title.text == "Zippyshare.com - ":
+			zippy_dl = zippy_soup.find('a', id="dlbutton")
+			if not zippy_dl is None:
+				print(colors.OKGREEN+"\t\t\t\thas dl button"+colors.ENDC)
+				zippy_js = zippy_soup.find_all('script')
+				for js in zippy_js:
+					if re.match('\\\\n   var somffunction', js.text):
+						a = re.search('var a = (\d*)\;', js.text)
+						if a.group(1):
+							secret = int(a.group(1))
+							download_secret = str(int((secret%78956)*(secret%3)+18))
+							url_info = url.split('/')
+							download_server = str(url_info[2].split('.')[0])
+							download_file = str(url_info[4])
+							zippy_title = zippy_soup.title.text.split(' - ')
+							zippy_title.pop(0)
+							download_name = " ".join(zippy_title)
+							download_name = urllib.parse.quote(download_name)
+							print("\t\t\t\t\tdirect link: "+download_server+".zippyshare.com/d/"+download_file+"/"+download_secret+"/"+download_name)
 
 def get_cookie(jar, name):
 	return [cookie for cookie in jar if cookie.name == name][0]
@@ -40,7 +68,7 @@ if os.environ.get('FUNKY_PASS'):
 	print(colors.OKGREEN+"\tSetting password from FUNKY_PASS"+colors.ENDC)
 	funky_pass = os.environ.get('FUNKY_PASS')
 
-funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890", "http://forum.funkysouls.com/index.php?s=&act=ST&f=71&t=11701"]
+funky_threads = ["http://forum.funkysouls.com/index.php?act=ST&f=71&t=355890"] #, "http://forum.funkysouls.com/index.php?s=&act=ST&f=71&t=11701"]
 
 funky_db = "sqlite:///funky.db"
 if os.environ.get('FUNKY_DB'):
@@ -48,12 +76,12 @@ if os.environ.get('FUNKY_DB'):
 	funky_db = os.environ.get('FUNKY_DB')
 
 # Database
-db = create_engine(funky_db)
-threads = Table()
-links = Table()
-files = Table()
+#db = create_engine(funky_db)
+#threads = Table()
+#links = Table()
+#files = Table()
 
-# Cookies
+# Cookies & opener
 print(colors.OKBLUE+"Making a cookie jar..."+colors.ENDC)
 cookies = http.cookiejar.LWPCookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
@@ -75,6 +103,9 @@ if not get_cookie(cookies, 'pass_hash') and not get_cookie(cookies, 'member_id')
 	print(colors.WARNING+"Couldn't login, wrong credentials?"+colors.ENDC)
 	exit(1)
 print(colors.OKGREEN+"\tLogged in"+colors.ENDC)
+
+# Attack lists
+zippy_list = []
 
 # Checking threads
 print(colors.OKBLUE+"Checking threads"+colors.ENDC)
@@ -120,14 +151,20 @@ for thread in funky_threads:
 						# Also check if it's already in mysql table, then push urls into a list 
 						if len(domain) is 3 and domain[1] in allowed_hosts:
 							print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
+							if domain[1] == 'zippyshare':
+								zippy_list.append(m.group(0))
+								
 						elif len(domain) is 2 and domain[0] in allowed_hosts:
 							print(colors.FAIL+"\t\t\t"+m.group(0)+colors.ENDC)
+							if domain[1] == 'zippyshare':
+                                                                zippy_list.append(m.group(0))
 				#time.sleep(0.5)
 
 # (after finished building link list)
-# Sort link list into seperate lists for seperate attack vectors
-
 # Execute each attack to download all files in link list (if dead link point that out in mysql...)
+for zippy_download in zippy_list:
+	# check if in mysql table first! (could also do in zippy attack function...)
+	zippy_attack(zippy_download) 
 
 # Extract files to temp dir, check if they have ID3 info, if not go to more extreme measures, store info in mysql database, if we get duplicate just delete it
 
